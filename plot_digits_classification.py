@@ -32,6 +32,15 @@ from sklearn.model_selection import train_test_split
 # Note: if we were working from image files (e.g., 'png' files), we would load
 # them using :func:`matplotlib.pyplot.imread`.
 
+GAMMA = 0.001
+c = 10
+
+train_frac = 0.7
+test_frac = 0.1
+dev_frac = 0.2
+
+
+
 digits = datasets.load_digits()
 
 _, axes = plt.subplots(nrows=1, ncols=4, figsize=(10, 3))
@@ -59,13 +68,26 @@ for ax, image, label in zip(axes, digits.images, digits.target):
 n_samples = len(digits.images)
 data = digits.images.reshape((n_samples, -1))
 
-# Create a classifier: a support vector classifier
-clf = svm.SVC(gamma=0.001)
-
 # Split data into 50% train and 50% test subsets
-X_train, X_test, y_train, y_test = train_test_split(
-    data, digits.target, test_size=0.5, shuffle=False
+dev_test_frac = 1-train_frac
+
+X_train, X_dev_test, y_train, y_dev_test = train_test_split(
+    data, digits.target, test_size=dev_test_frac, shuffle=True
 )
+
+
+X_test, X_dev, y_test, y_dev = train_test_split(
+    X_dev_test, y_dev_test, test_size=(dev_frac)/dev_test_frac, shuffle=True
+)
+
+# Create a classifier: a support vector classifier
+#clf = svm.SVC(gamma=GAMMA)
+clf = svm.SVC()
+hyper_params = {'gamma':GAMMA, 'C':c}
+clf.set_params(**hyper_params)
+
+
+
 
 # Learn the digits on the train subset
 clf.fit(X_train, y_train)
@@ -101,4 +123,4 @@ disp = metrics.ConfusionMatrixDisplay.from_predictions(y_test, predicted)
 disp.figure_.suptitle("Confusion Matrix")
 print(f"Confusion matrix:\n{disp.confusion_matrix}")
 
-plt.show()
+# plt.show()
