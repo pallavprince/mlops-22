@@ -22,8 +22,8 @@ def svm_hyperparameters_tunning(imagedataset) :
     
     n_samples = len(digits.images)
     data = imagedataset.reshape((n_samples, -1))
-    train_frac=0.5
-    test_frac=0.3
+    train_frac=0.6
+    test_frac=0.2
     dev_frac=0.2
     dev_test_frac=1-train_frac
     
