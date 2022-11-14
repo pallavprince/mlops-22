@@ -1,179 +1,71 @@
-# Author: Gael Varoquaux <gael dot varoquaux at normalesup dot org>
-# License: BSD 3 clause
+from sklearn import datasets, svm, metrics, tree
+import pdb
 
+from utils import (
+    preprocess_digits,
+    train_dev_test_split,
+    data_viz,
+    get_all_h_param_comb,
+    tune_and_save,
+    macro_f1
+)
+from joblib import dump, load
 
-#PART: library dependencies -- sklear, torch, tensorflow, numpy, transformers
+train_frac, dev_frac, test_frac = 0.8, 0.1, 0.1
+assert train_frac + dev_frac + test_frac == 1.0
 
-# Standard scientific Python imports
-import matplotlib.pyplot as plt
+gamma_list = [0.05, 0.005, 0.001, 0.0002, 0.0001]
+c_list = [0.1, 0.2, 0.5, 0.8, 1, 2, 5, 8, 10]
 
-# Import datasets, classifiers and performance metrics
-from sklearn import datasets, svm, metrics
-from sklearn.model_selection import train_test_split
+svm_params = {}
+svm_params["gamma"] = gamma_list
+svm_params["C"] = c_list
+svm_h_param_comb = get_all_h_param_comb(svm_params)
 
+max_depth_list = [2, 10, 20, 50, 100]
 
-gamma_list = [0.01 ,0.005, 0.001, 0.0005, 0.0001]
-c_list = [0.1 ,0.2, 0.5, 0.7 ,1 ,2, 5 ,7,10]
+dec_params = {}
+dec_params["max_depth"] = max_depth_list
+dec_h_param_comb = get_all_h_param_comb(dec_params)
 
-h_params_comb = [{'gamma':g,"C":c} for g in gamma_list for c in c_list]
+h_param_comb = {"svm": svm_h_param_comb, "decision_tree": dec_h_param_comb}
 
-assert len(h_params_comb) == len(gamma_list)*len(c_list)
-
-#model hyperparameter
-
-
-
-
-
-train_frac = 0.8
-test_frac = 0.1
-dev_frac = 0.1
-#PART: load datsets -data from csv,tsv,json,pickel
-import matplotlib.pyplot as plt
-
-# Import datasets, classifiers and performance metrics
-from sklearn import datasets, svm, metrics
-from sklearn.model_selection import train_test_split
-from skimage import transform
 digits = datasets.load_digits()
-features=digits.data
-targets=digits.target
+data_viz(digits)
+data, label = preprocess_digits(digits)
+del digits
 
+metric_list = [metrics.accuracy_score, macro_f1]
+h_metric = metrics.accuracy_score
 
-resoArr = [4, 16, 256]
-resimg = []
-for res in resoArr:
-#     for i in range(len(features)):
-#         print (digits.data.shape)
-        # newfeatures2=transform.resize(features[i].reshape(8,8),(res,res))
-
-    newfeatures2=[transform.resize(features[i].reshape(8,8),(res,res))for i in range(len(features))]
-    for k in range (10):
-        resimg.append (newfeatures2[k].reshape(res,res))
+n_cv = 5
+results = {}
+for n in range(n_cv):
+    x_train, y_train, x_dev, y_dev, x_test, y_test = train_dev_test_split(
+        data, label, train_frac, dev_frac
+    )
     
-# plt.imshow(resimg[0])
-# plt.show()
+    models_of_choice = {
+        "svm": svm.SVC(),
+        "decision_tree": tree.DecisionTreeClassifier(),
+    }
+    for clf_name in models_of_choice:
+        clf = models_of_choice[clf_name]
+        print("[{}] Running hyper param tuning for {}".format(n,clf_name))
+        actual_model_path = tune_and_save(
+            clf, x_train, y_train, x_dev, y_dev, h_metric, h_param_comb[clf_name], model_path=None
+        )
 
+        best_model = load(actual_model_path)
+        predicted = best_model.predict(x_test)
+        if not clf_name in results:
+            results[clf_name]=[]    
 
+        results[clf_name].append({m.__name__:m(y_pred=predicted, y_true=y_test) for m in metric_list})
 
-# newfeatures2=[transform.resize(features[i].reshape(8,8),(256,256))for i in range(len(features))]
-# for i in range(4):
-#   x = newfeatures2[i].reshape((128,128))
-#   plt.imshow(x)
-fig = plt.figure(figsize=(10,5))
-imgArr=[]
-n= len(resimg)
-for i in range(n):
-    fig.add_subplot(3,n//3,i+1)
-    #   x = newfeatures2[i].reshape((8,8))
-    x = resimg[i]
-    imgArr.append(x[:,:])
-    
-    plt.imshow(x)
-    if i == 5:
-        plt.title(f"I have taken Resolution 1: as {(resoArr[0])} X {(resoArr[0])} ")
-    elif i == 15:
-        plt.title(f"I have taken Resolution 2: as {(resoArr[1])} X {(resoArr[1])} ")
-    elif i == 25:
-        plt.title(f"I have taken Resolution 3: as {(resoArr[2])} X {(resoArr[2])} ")
+        print(
+            f"Classifier report {clf}:\n"
+            f"{metrics.classification_report(y_test, predicted)}\n"
+        )
 
-
-    plt.axis('off')
-
-#PART: sanity check visyualization of the data
-_, axes = plt.subplots(nrows=1, ncols=4, figsize=(10, 3))
-for ax, image, label in zip(axes, digits.images, digits.target):
-    ax.set_axis_off()
-    ax.imshow(image, cmap=plt.cm.gray_r, interpolation="nearest")
-    ax.set_title("Training: %i" % label)
-
-###############################################################################
-
-#PART: data prprocessing  -- to remove some noise, to normalize data,format the data to be consumed by nod
-# flatten the images
-n_samples = len(digits.images)
-
-############################################
-print("\nSize of Images in digits dataset\t" + str(digits.images.shape)+"\n")
-#############################################
-data = digits.images.reshape((n_samples, -1))
-
-#PART: define train/dev/test splits of experiments protocol
-# Split data into 50% train and 50% test subsets
-
-#80:10:10 train:dev:test
-#define model
-dev_test_frac = 1-train_frac
-X_train,X_dev_test, y_train, y_dev_test = train_test_split(
-    data, digits.target, test_size=dev_test_frac, shuffle=True
-)
-
-
-X_test,X_dev, y_test, y_dev = train_test_split(
-    X_dev_test,y_dev_test, test_size=(dev_frac)/(dev_test_frac), shuffle=True
-)
-
-#if tsting on the same as training set: the performance metrics may overstimate the goodness of the model
-#you want to test on "unseen" samples.
-#train to train model
-#dev to set hyperparameters of the model
-#test to evaluate the performance of the model
-
-#part : definf 
-# Create a classifier: a support vector classifier
-best_acc = -1.0
-best_model = None
-best_h_params = None
-for cur_h_params in h_params_comb:
-    GAMMA = 0.001
-    C = 0.5
-    clf = svm.SVC()
-
-    #part: setting up hyperparameter
-    hyper_params = {'gamma':GAMMA,"C":C}
-    clf.set_params(**hyper_params)
-
-
-
-
-    # Learn the digits on the train subset
-    clf.fit(X_train, y_train)
-  
-    #PART: 
-    # Predict the value of the digit on the test subset
-    predicted_dev = clf.predict(X_dev)
-    cur_acc = metrics.accuracy_score(y_pred = predicted_dev,y_true = y_dev)
-
-    if cur_acc > best_acc:
-        best_acc = cur_acc
-        best_model = clf
-        best_h_params = cur_h_params
-        print("found new best acc with: "+str(cur_h_params))
-        print("New best val accuracy:"+str(cur_acc))
-
-predicted = best_model.predict(X_test)
-    
-#PART: get test set predictions
-_, axes = plt.subplots(nrows=1, ncols=4, figsize=(10, 3))
-for ax, image, prediction in zip(axes, X_test, predicted):
-    ax.set_axis_off()
-    image = image.reshape(8, 8)
-    ax.imshow(image, cmap=plt.cm.gray_r, interpolation="nearest")
-    ax.set_title(f"Prediction: {prediction}")
-
-
-
-print(
-    f"Classification report for classifier {clf}:\n"
-    f"{metrics.classification_report(y_test, predicted)}\n"
-)
-
-# disp = metrics.ConfusionMatrixDisplay.from_predictions(y_test, predicted)
-# disp.figure_.suptitle("Confusion Matrix")
-# print(f"Confusion matrix:\n{disp.confusion_matrix}")
-
-plt.show()
-
-print("Best hyperparameters were: ")
-print(cur_h_params)
-
+print(results)

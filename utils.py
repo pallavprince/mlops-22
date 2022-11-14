@@ -49,7 +49,6 @@ def data_viz(dataset):
         ax.set_title("Training: %i" % label)
 
 
-# PART: Sanity check of predictions
 def pred_image_viz(x_test, predictions):
     _, axes = plt.subplots(nrows=1, ncols=4, figsize=(10, 3))
     for ax, image, prediction in zip(axes, x_test, predictions):
@@ -57,12 +56,6 @@ def pred_image_viz(x_test, predictions):
         image = image.reshape(8, 8)
         ax.imshow(image, cmap=plt.cm.gray_r, interpolation="nearest")
         ax.set_title(f"Prediction: {prediction}")
-
-
-# PART: define train/dev/test splits of experiment protocol
-# train to train model
-# dev to set hyperparameters of the model
-# test to evaluate the performance of the model
 
 
 def train_dev_test_split(data, label, train_frac, dev_frac):
@@ -82,26 +75,17 @@ def h_param_tuning(h_param_comb, clf, x_train, y_train, x_dev, y_dev, metric, ve
     best_metric = -1.0
     best_model = None
     best_h_params = None
-    # 2. For every combination-of-hyper-parameter values
     for cur_h_params in h_param_comb:
 
-        # PART: setting up hyperparameter
         hyper_params = cur_h_params
         clf.set_params(**hyper_params)
 
-        # PART: Train model
-        # 2.a train the model
-        # Learn the digits on the train subset
         clf.fit(x_train, y_train)
 
-        # print(cur_h_params)
-        # PART: get dev set predictions
         predicted_dev = clf.predict(x_dev)
 
-        # 2.b compute the accuracy on the validation set
         cur_metric = metric(y_pred=predicted_dev, y_true=y_dev)
 
-        # 3. identify the combination-of-hyper-parameter for which validation set accuracy is the highest.
         if cur_metric > best_metric:
             best_metric = cur_metric
             best_model = clf
@@ -119,7 +103,6 @@ def tune_and_save(
         h_param_comb, clf, x_train, y_train, x_dev, y_dev, metric
     )
 
-    # save the best_model
     best_param_config = "_".join(
         [h + "=" + str(best_h_params[h]) for h in best_h_params]
     )
@@ -135,9 +118,9 @@ def tune_and_save(
         model_path = best_model_name
     dump(best_model, model_path)
 
-    print("Best hyperparameters were:" + str(best_h_params))
+    print("Here best hyperparameters table:" + str(best_h_params))
 
-    print("Best Metric on Dev was:{}".format(best_metric))
+    print("Here best Metric on Dev:{}".format(best_metric))
 
     return model_path
 
