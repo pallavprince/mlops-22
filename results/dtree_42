@@ -1,0 +1,1 @@
+test accuracy 0.8436test macro-f1 0.8436model saved at svm_gamma=0.001_C=0.2.joblibtest accuracy 0.8771test macro-f1 0.8771model saved at svm_gamma=0.001_C=0.2.joblibtest accuracy 0.8324test macro-f1 0.8324model saved at svm_gamma=0.001_C=0.2.joblibtest accuracy 0.8436test macro-f1 0.8436model saved at svm_gamma=0.001_C=0.2.joblib
